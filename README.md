@@ -70,7 +70,7 @@ re-insert them into the CGI scripts to see any changes.
 ## Installation
 
 I'm assuming you're using Apache2 for hosting services at your site.  To setup
-**INTER** run though the following steps.
+**INTR** run though the following steps.
 
 ### 1. Enable Apache modules
 
