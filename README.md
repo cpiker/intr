@@ -224,5 +224,5 @@ local web-service security guidelines before making assumptions.
 > It is completely reasonable to forbid AI generated software in some contexts.
 > Please check the contribution guidelines of any projects you participate in.
 > If the project has a rule against AI generated software then DO NOT INCLUDE
-> THIS FILE, in whole or in part, in your patches or pull requests.
+> THESE FILES, in whole or in part, in your patches or pull requests.
 
