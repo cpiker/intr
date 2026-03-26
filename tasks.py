@@ -354,6 +354,8 @@ BANNER_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 
     </marker>
   </defs>
 
+  <g transform="translate(80,0)">
+
   <!-- ── SIGNAL LINE ── -->
   <line x1="0"   y1="105" x2="500" y2="105"
         stroke="#C9A84C" stroke-width="1.3" opacity="0.4"/>
