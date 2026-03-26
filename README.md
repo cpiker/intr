@@ -12,6 +12,8 @@ the top slot shows what you're currently doing.  Finished tasks move to a
 yearly done archive.  Co-workers can see your queue without logging in.
 Only you can change anything.
 
+![Task page screenshot](img/screenshot.png)
+
 ## Requirements
 
 - Apache 2.4 with `mod_cgi` and `mod_rewrite`
