@@ -9,16 +9,22 @@
 # 
 # ```json
 # {
-#    "current":      { "id": "...", "name": "...", "notes": "...", "created_at": "..." },
+#    "current":      { "id": "...", "name": "...", "notes": "...", "created_at": "...", "label": "Juno" },
 #    "idle_active":  false,
 #    "idle_notes":   "",
-#    "queue":        [ { "id": "...", "name": "...", "notes": "...", "created_at": "..." } ]
+#    "labels":       [ "Juno", "TRACERS", "Admin" ],
+#    "queue":        [ { "id": "...", "name": "...", "notes": "...", "created_at": "...", "label": "Juno" } ]
 # }
 # 
 # 
 # `queue[0]` is the highest priority waiting task.  `current` is what is being
 # worked on right now.  When `idle_active` is true the Idle state is active and
 # `current` is null.
+#
+# `labels` is the master list of charge-account-style label strings (max 32 chars
+# each).  Tasks carry an optional `label` field referencing one of these.  Labels
+# are stored on the task itself, so completed tasks in done_YYYY.json retain their
+# label even if the label is later removed from the master list.
 # 
 # `done_YYYY.json` is a flat array of completed task objects, each with
 # `name`, `notes`, `created_at`, and `completed_at` fields.
@@ -36,16 +42,13 @@
 #    THIS FILE, in whole or in part, in your patches or pull requests.
 
 
-import cgi
-import cgitb
+import urllib.parse
 import json
 import os
 import sys
 import html
 import uuid
 from datetime import datetime, timezone
-
-cgitb.enable()
 
 # ########################################################################### #
 # configuration #
@@ -69,6 +72,20 @@ TASKS_SCRIPT_NAME = 'intr'
 DONE_SCRIPT_NAME = 'handled'
 
 # ########################################################################### #
+# remove cgi module dependency #
+
+def get_post_form():
+	length = int(os.environ.get('CONTENT_LENGTH', 0) or 0)
+	body = sys.stdin.buffer.read(length).decode('utf-8', errors='replace')
+	pairs = urllib.parse.parse_qs(body, keep_blank_values=True)
+	# parse_qs returns lists; wrap it to mimic FieldStorage.getvalue()
+	class SimpleForm:
+		def getvalue(self, key, default=None):
+			vals = pairs.get(key)
+			return vals[0] if vals else default
+	return SimpleForm()
+
+# ########################################################################### #
 # Operation and Data model
 #
 # tasks.json structure:
@@ -85,9 +102,12 @@ DONE_SCRIPT_NAME = 'handled'
 
 def load_tasks():
 	if not os.path.exists(TASKS_FILE):
-		return {"current": None, "idle_notes": "", "idle_active": True, "queue": []}
-	with open(TASKS_FILE, 'r') as f:
-		return json.load(f)
+		return {"current": None, "idle_notes": "", "idle_active": True, "labels": [], "queue": []}
+	data = json.load(open(TASKS_FILE, 'r'))
+	# Migrate older files that predate the labels field.
+	if "labels" not in data:
+		data["labels"] = []
+	return data
 
 def save_tasks(data):
 	os.makedirs(os.path.dirname(TASKS_FILE), exist_ok=True)
@@ -115,13 +135,16 @@ def save_done(entries):
 		json.dump(entries, f, indent='\t')
 	os.replace(tmp, path)
 
-def new_task(name, notes):
-	return {
+def new_task(name, notes, label=''):
+	task = {
 		"id": str(uuid.uuid4()),
 		"name": name.strip(),
 		"notes": notes.strip(),
 		"created_at": datetime.now(timezone.utc).isoformat()
 	}
+	if label:
+		task["label"] = label
+	return task
 
 def is_authenticated():
 	# Apache sets REMOTE_USER when HTTP auth succeeds.
@@ -151,6 +174,22 @@ def h(s):
 	# HTML-escape a string.
 	return html.escape(str(s) if s else '', quote=True)
 
+def label_select(labels, selected='', field_name='label'):
+	"""Render a <select> dropdown for label choice.  Empty option = no label."""
+	out = [f'<select name="{field_name}">']
+	out.append('<option value="">(no label)</option>')
+	for lbl in labels:
+		sel = ' selected' if lbl == selected else ''
+		out.append(f'<option value="{h(lbl)}"{sel}>{h(lbl)}</option>')
+	out.append('</select>')
+	return ''.join(out)
+
+def label_badge(label):
+	"""Render a label badge span, or empty string if no label."""
+	if not label:
+		return ''
+	return f'<span class="label-badge">{h(label)}</span>'
+
 # ########################################################################### #
 # Handle POST actions (all require auth) #
 
@@ -166,10 +205,14 @@ def handle_post(form, data):
 	if action == 'push':
 		name  = form.getvalue('name', '').strip()
 		notes = form.getvalue('notes', '').strip()
+		label = form.getvalue('label', '').strip()[:32]
 		pos   = form.getvalue('pos', 'top')
+		# Validate label against master list (ignore if not present)
+		if label and label not in data.get('labels', []):
+			label = ''
 		if not name:
 			redirect(); return
-		task = new_task(name, notes)
+		task = new_task(name, notes, label)
 		if pos == 'top':
 			# New task becomes current; old current goes to top of queue.
 			if data['current'] and not data['idle_active']:
@@ -243,13 +286,21 @@ def handle_post(form, data):
 			data['queue'][idx+1], data['queue'][idx] = data['queue'][idx], data['queue'][idx+1]
 
 	elif action == 'edit':
-		# Edit name/notes on a queue task or the current task.
+		# Edit name/notes/label on a queue task or the current task.
 		target = form.getvalue('target', 'queue')
 		name   = form.getvalue('name', '').strip()
 		notes  = form.getvalue('notes', '').strip()
+		label  = form.getvalue('label', '').strip()[:32]
+		# Validate label — empty string means "no label"
+		if label and label not in data.get('labels', []):
+			label = ''
 		if target == 'current' and data['current']:
 			if name: data['current']['name']  = name
 			data['current']['notes'] = notes
+			if label:
+				data['current']['label'] = label
+			else:
+				data['current'].pop('label', None)
 		elif target == 'idle':
 			data['idle_notes'] = notes
 		else:
@@ -257,6 +308,10 @@ def handle_post(form, data):
 			if 0 <= idx < len(data['queue']):
 				if name: data['queue'][idx]['name']  = name
 				data['queue'][idx]['notes'] = notes
+				if label:
+					data['queue'][idx]['label'] = label
+				else:
+					data['queue'][idx].pop('label', None)
 
 	elif action == 'set_idle':
 		# Park current task back on queue, set state to Idle.
@@ -264,6 +319,20 @@ def handle_post(form, data):
 			data['queue'].insert(0, data['current'])
 		data['current'] = None
 		data['idle_active'] = True
+
+	elif action == 'add_label':
+		# Add a new label to the master list.  32-char max, no dupes.
+		new_label = form.getvalue('label_name', '').strip()[:32]
+		if new_label and new_label not in data.get('labels', []):
+			data.setdefault('labels', []).append(new_label)
+
+	elif action == 'remove_label':
+		# Remove a label from the master list.  Tasks that carry it keep
+		# their label value (historical record); it just won't appear in
+		# dropdowns anymore until re-added.
+		del_label = form.getvalue('label_name', '').strip()
+		if del_label in data.get('labels', []):
+			data['labels'].remove(del_label)
 
 	save_tasks(data)
 	redirect()
@@ -307,7 +376,7 @@ BANNER_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 
 
     <text x="598" y="93" text-anchor="middle" dominant-baseline="central"
           font-family="monospace,'Courier New',Courier"
-          font-size="6" font-weight="bold" fill="#C9A84C">INTR ?!</text>
+          font-size="10" font-weight="bold" fill="#C9A84C">INTR?!</text>
 
     <!-- left pins 1-17 and 19-20 -->
     <g stroke="#4a4a4a" stroke-width="1" stroke-linecap="round" fill="none">
@@ -422,7 +491,7 @@ BANNER_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 
   <!-- ── LABELS ── -->
   <text x="14" y="30"
         font-family="monospace,'Courier New',Courier"
-        font-size="16" font-weight="bold" fill="#C9A84C"
+        font-size="26" font-weight="bold" fill="#C9A84C"
         opacity="0.9">INTR</text>
   <text x="14" y="50"
         font-family="monospace,'Courier New',Courier"
@@ -441,7 +510,7 @@ body {
 	color: #111;
 }
 #page {
-	max-width: 860px;
+	max-width: min(1400px, 95vw);
 	margin: 0 auto;
 	padding: 12px 16px;
 }
@@ -505,7 +574,7 @@ tr:hover td { background: #f0f0f0; }
 .actions form { display: inline; }
 .actions button {
 	font-size: 11px;
-	padding: 1px 5px;
+	padding: 4px 8px;
 	cursor: pointer;
 	background: #e8e8e8;
 	border: 1px solid #aaa;
@@ -513,6 +582,53 @@ tr:hover td { background: #f0f0f0; }
 }
 .actions button:hover { background: #d0d0d0; }
 .btn-warn { background: #fdd !important; border-color: #c88 !important; }
+
+/* Label badge */
+.label-badge {
+	display: inline-block;
+	font-size: 10px;
+	padding: 1px 5px;
+	/* border: 1px solid #b8922a; */
+	background: #fdf3dc;
+	color: #7a5c10;
+	border-radius: 2px;
+	margin-left: 4px;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+/* Label management section */
+#label-section {
+	border-top: 1px dashed #aaa;
+	padding-top: 10px;
+	margin-top: 6px;
+	color: #555;
+	font-size: 12px;
+}
+#label-section .label-list { margin: 4px 0 8px; }
+#label-section .label-list form { display: inline; }
+#label-section .label-list button {
+	font-size: 10px;
+	padding: 0px 4px;
+	cursor: pointer;
+	background: #fdd;
+	border: 1px solid #c88;
+	margin-left: 3px;
+	vertical-align: middle;
+}
+#label-add-form { margin-top: 4px; }
+#label-add-form input[type=text] {
+	font-family: monospace;
+	font-size: 12px;
+	border: 1px solid #aaa;
+	padding: 2px 4px;
+	width: 18em;
+}
+#label-add-form input[type=submit] {
+	font-size: 12px;
+	padding: 2px 8px;
+	cursor: pointer;
+}
 
 /* Idle row */
 #idle-section {
@@ -587,18 +703,32 @@ def action_form(action, extra_inputs='', label='', btn_class=''):
 	return (f'<form method="post" action="{script}">'
 	        f'<input type="hidden" name="action" value="{action}">'
 	        f'{extra_inputs}'
-	        f'<button type="submit"{cls}>{h(label)}</button>'
+	        f'<button type="submit"{cls}>{label}</button>'
+	        f'</form>')
+
+def danger_form(action, extra_inputs='', label='Drop', confirm_msg='Drop this task?'):
+	# Like action_form but with a confirm() dialog to prevent accidental clicks.
+	script = os.environ.get('SCRIPT_NAME', 'tasks')
+	msg = confirm_msg.replace("'", "\\'")
+	return (f'<form method="post" action="{script}">'
+	        f'<input type="hidden" name="action" value="{action}">'
+	        f'{extra_inputs}'
+	        f'<button type="submit" class="btn-warn" '
+	        f"onclick=\"return confirm('{msg}')\">{label}</button>"
 	        f'</form>')
 
 def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=False):
+	labels = data.get('labels', [])
 	print("Content-Type: text/html; charset=utf-8\r\n\r")
 	script = os.environ.get('SCRIPT_NAME')
-	done_script = script.replace(TASKS_SCRIPT_NAME, DONE_SCRIPT_NAME, 1)
+	
+	base, _ = script.rsplit('/', 1)
+	done_script = f'{base}/{DONE_SCRIPT_NAME}'
+	login_url   = f'{base}/intr-auth/{TASKS_SCRIPT_NAME}'
 
 	if authenticated:
 		auth_notice = f'Logged in as {h(os.environ.get("REMOTE_USER",""))}'
 	else:
-		login_url = script.replace(TASKS_SCRIPT_NAME, f'intr-auth/{TASKS_SCRIPT_NAME}')
 		auth_notice = f'Read-only view &mdash; <a href="{h(login_url)}">log in</a> to make changes'
 
 	print(f"""<!DOCTYPE html>
@@ -643,11 +773,14 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print('<input type="hidden" name="target" value="current">')
 			print(f'<input type="text" name="name" value="{h(cur["name"])}" style="font-size:15px;font-weight:bold;margin-bottom:4px;"><br>')
 			print(f'<textarea name="notes">{h(cur.get("notes",""))}</textarea><br>')
+			if labels:
+				print(f'<label style="font-size:11px;">Label: {label_select(labels, cur.get("label",""))}</label><br>')
 			print('<input type="submit" value="Save"> ')
 			print(f'<a href="{h(script)}">Cancel</a>')
 			print('</form>')
 		else:
-			print(f'<div id="current-title">{h(cur["name"])}</div>')
+			cur_label = cur.get('label', '')
+			print(f'<div id="current-title">{h(cur["name"])}{label_badge(cur_label)}</div>')
 			notes = cur.get('notes', '')
 			if notes:
 				print(f'<div class="task-notes">{h(notes)}</div>')
@@ -656,7 +789,7 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			if authenticated:
 				print('<div class="actions">')
 				print(action_form('complete', '', 'Mark done', ''))
-				print(action_form('drop_current', '', 'Drop (no log)', 'btn-warn'))
+				print(danger_form('drop_current', '', 'Drop (no log)', 'Drop current task without logging?'))
 				print(action_form('set_idle', '', 'Go idle'))
 				print(f'<a href="{h(script)}?edit=current" style="font-size:12px;">Edit</a>')
 				print('</div>')
@@ -673,6 +806,8 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print('<input type="text" name="name" autofocus required>')
 			print('<label>Notes</label>')
 			print('<textarea name="notes"></textarea>')
+			if labels:
+				print(f'<label>Label: {label_select(labels)}</label>')
 			print('<label>Position</label>')
 			print('<div class="radio-row"><label><input type="radio" name="pos" value="top" checked> Push to top (becomes current)</label></div>')
 			print('<div class="radio-row"><label><input type="radio" name="pos" value="second"> Insert at #1 in queue (after current)</label></div>')
@@ -682,54 +817,6 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print('</form></div>')
 		else:
 			print(f'<p><a href="{h(script)}?push=1">&#x25b6; Push new task</a></p>')
-
-	# --- Queue ---
-	queue = data.get('queue', [])
-	print('<h2>Queue</h2>')
-	if not queue:
-		print('<p style="color:#888;font-size:13px;">Queue is empty.</p>')
-	else:
-		print('<table>')
-		print('<tr><th>#</th><th>Task</th><th>Notes</th><th>Age</th><th>Actions</th></tr>')
-		for i, task in enumerate(queue):
-			age = duration_str(task.get('created_at',''))
-			print('<tr>')
-			print(f'<td class="num">{i+1}</td>')
-
-			if edit_target == 'queue' and edit_idx == i and authenticated:
-				print(f'<td colspan="2"><form method="post" action="{h(script)}" class="edit-form">')
-				print(f'<input type="hidden" name="action" value="edit">')
-				print(f'<input type="hidden" name="target" value="queue">')
-				print(f'<input type="hidden" name="idx" value="{i}">')
-				print(f'<input type="text" name="name" value="{h(task["name"])}"><br>')
-				print(f'<textarea name="notes">{h(task.get("notes",""))}</textarea><br>')
-				print('<input type="submit" value="Save"> ')
-				print(f'<a href="{h(script)}">Cancel</a>')
-				print('</form></td>')
-				print(f'<td>{h(age)}</td>')
-				print('<td></td>')
-			else:
-				print(f'<td><span class="taskname">{h(task["name"])}</span></td>')
-				notes = task.get('notes', '')
-				print(f'<td><span class="qnotes">{h(notes)}</span></td>')
-				print(f'<td>{h(age)}</td>')
-				if authenticated:
-					idx_input = f'<input type="hidden" name="idx" value="{i}">'
-					print('<td class="actions">')
-					print(action_form('grab',           idx_input, 'Work on'))
-					print(action_form('complete_queue', idx_input, 'Done'))
-					if i > 0:
-						print(action_form('move_up',   idx_input, '&#x25b2;'))
-					if i < len(queue) - 1:
-						print(action_form('move_down',  idx_input, '&#x25bc;'))
-					print(f'<a href="{h(script)}?edit=queue&idx={i}" style="font-size:11px;">Edit</a> ')
-					print(action_form('drop',           idx_input, 'Drop', 'btn-warn'))
-					print('</td>')
-				else:
-					print('<td></td>')
-
-			print('</tr>')
-		print('</table>')
 
 	# --- Idle ---
 	print('<div id="idle-section">')
@@ -753,6 +840,80 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print(f' <a href="{h(script)}?edit=idle" style="font-size:11px;">Edit notes</a>')
 	print('</div>')
 
+
+	# --- Queue ---
+	queue = data.get('queue', [])
+	print('<h2>Queue</h2>')
+	if not queue:
+		print('<p style="color:#888;font-size:13px;">Queue is empty.</p>')
+	else:
+		print('<table>')
+		print('<tr><th>#</th><th>Task</th><th>Notes</th><th>Age</th><th>Actions</th></tr>')
+		for i, task in enumerate(queue):
+			age = duration_str(task.get('created_at',''))
+			print('<tr>')
+			print(f'<td class="num">{i+1}</td>')
+
+			if edit_target == 'queue' and edit_idx == i and authenticated:
+				print(f'<td colspan="2"><form method="post" action="{h(script)}" class="edit-form">')
+				print(f'<input type="hidden" name="action" value="edit">')
+				print(f'<input type="hidden" name="target" value="queue">')
+				print(f'<input type="hidden" name="idx" value="{i}">')
+				print(f'<input type="text" name="name" value="{h(task["name"])}"><br>')
+				print(f'<textarea name="notes">{h(task.get("notes",""))}</textarea><br>')
+				if labels:
+					print(f'Label: {label_select(labels, task.get("label",""))}<br>')
+				print('<input type="submit" value="Save"> ')
+				print(f'<a href="{h(script)}">Cancel</a>')
+				print('</form></td>')
+				print(f'<td>{h(age)}</td>')
+				print('<td></td>')
+			else:
+				task_label = task.get('label', '')
+				print(f'<td>{label_badge(task_label)} <span class="taskname">{h(task["name"])}</span></td>')
+				notes = task.get('notes', '')
+				print(f'<td><span class="qnotes">{h(notes)}</span></td>')
+				print(f'<td>{h(age)}</td>')
+				if authenticated:
+					idx_input = f'<input type="hidden" name="idx" value="{i}">'
+					print('<td class="actions">')
+					print(action_form('grab',           idx_input, 'Work on'))
+					print(action_form('complete_queue', idx_input, 'Done'))
+					if i > 0:
+						print(action_form('move_up',   idx_input, '&#x25b2;'))
+					if i < len(queue) - 1:
+						print(action_form('move_down',  idx_input, '&#x25bc;'))
+					print(f'<a href="{h(script)}?edit=queue&idx={i}" style="font-size:11px;">Edit</a> ')
+					print(danger_form('drop', idx_input, 'Drop', 'Drop this task without logging?'))
+					print('</td>')
+				else:
+					print('<td></td>')
+
+			print('</tr>')
+		print('</table>')
+
+	# --- Label management ---
+	if authenticated:
+		print('<div id="label-section">')
+		print('<b>Labels</b>')
+		if labels:
+			print('<div class="label-list">')
+			for lbl in labels:
+				lbl_input = f'<input type="hidden" name="label_name" value="{h(lbl)}">'
+				print(f'{label_badge(lbl)} ')
+				print(danger_form('remove_label', lbl_input, '&times;', f"Remove label '{lbl}'?"))
+			print('</div>')
+		else:
+			print(' <span style="color:#aaa;font-size:11px;">(none defined)</span>')
+		print(f'<div id="label-add-form">')
+		print(f'<form method="post" action="{h(script)}">')
+		print('<input type="hidden" name="action" value="add_label">')
+		print('<input type="text" name="label_name" maxlength="32" placeholder="New label (32 char max)">')
+		print('<input type="submit" value="Add">')
+		print('</form>')
+		print('</div>')
+		print('</div>')
+
 	print(f'<p style="font-size:10px;color:#bbb;margin-top:16px;">tasks &mdash; {len(queue)} in queue</p>')
 	print('</div></body></html>')
 
@@ -768,7 +929,7 @@ def main():
 	data = load_tasks()
 
 	if method == 'POST':
-		form = cgi.FieldStorage()
+		form = get_post_form()
 		handle_post(form, data)
 		return
 

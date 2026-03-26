@@ -15,13 +15,11 @@
 #    If the project has a rule against AI generated software then DO NOT INCLUDE
 #    THIS FILE, in whole or in part, in your patches or pull requests.
 
-import cgitb
 import json
 import os
 import html
 from datetime import datetime, timezone, timedelta
 
-cgitb.enable()
 
 # ########################################################################### #
 # configuration #
@@ -49,6 +47,12 @@ DONE_SCRIPT_NAME = 'handled'
 
 def h(s):
 	return html.escape(str(s) if s else '', quote=True)
+
+def label_badge(label):
+	"""Render a label badge span, or empty string if no label."""
+	if not label:
+		return ''
+	return f'<span class="label-badge">{h(label)}</span>'
 
 def load_done(year):
 	path = os.path.join(DONE_DIR, f'done_{year}.json')
@@ -238,7 +242,7 @@ BANNER_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 
   <!-- ── LABELS ── -->
   <text x="14" y="30"
         font-family="monospace,'Courier New',Courier"
-        font-size="16" font-weight="bold" fill="#C9A84C"
+        font-size="26" font-weight="bold" fill="#C9A84C"
         opacity="0.9">INTR</text>
   <text x="14" y="50"
         font-family="monospace,'Courier New',Courier"
@@ -257,7 +261,7 @@ body {
 	color: #111;
 }
 #page {
-	max-width: 860px;
+	max-width: min(1400px, 95vw);
 	margin: 0 auto;
 	padding: 12px 16px;
 }
@@ -298,6 +302,20 @@ tr:hover td { background: #f0f0f0; }
 .age-col  { white-space: nowrap; color: #777; width: 5em; }
 .week-count { font-size: 11px; color: #888; float: right; font-weight: normal; }
 #year-select { font-size: 13px; margin-bottom: 12px; }
+
+/* Label badge — matches tasks.py */
+.label-badge {
+	display: inline-block;
+	font-size: 10px;
+	padding: 1px 5px;
+	/* border: 1px solid #b8922a; */
+	background: #fdf3dc;
+	color: #7a5c10;
+	border-radius: 2px;
+	margin-left: 4px;
+	vertical-align: middle;
+	white-space: nowrap;
+}
 """
 
 # ########################################################################### #
@@ -386,10 +404,11 @@ def main():
 			# Newest first within week
 			for dt, entry in sorted(week['tasks'], key=lambda x: x[0], reverse=True):
 				name      = entry.get('name', '(unnamed)')
+				task_label = entry.get('label', '')
 				comp_str  = dt.strftime('%a %b %d')
 				age       = duration_str(entry.get('created_at',''), entry.get('completed_at',''))
 				print(f'<tr>')
-				print(f'<td class="taskname">{h(name)}</td>')
+				print(f'<td class="taskname">{h(name)}{label_badge(task_label)}</td>')
 				print(f'<td class="date-col">{h(comp_str)}</td>')
 				print(f'<td class="age-col">{h(age)}</td>')
 				print(f'</tr>')
