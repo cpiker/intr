@@ -105,39 +105,62 @@ location.  Both aliases point at the same script directory so the same files
 handle both.  The `LocationMatch` block scopes the rewrite to only these two
 scripts — other CGI on the server is unaffected.
 
-Add the following inside your `<VirtualHost>` block:
+Add the following, or similar inside your `<VirtualHost>` block.
+There's a million ways to configure Apache.  This is just an example.
 
 ```apache
-# Both paths serve from the same script directory.
-# /cgi-bin/      -> open to all (GET)
-# /cgi-bin-auth/ -> requires Basic Auth (POST target)
-ScriptAlias /cgi-bin/      "/var/www/cgi-bin/"
-ScriptAlias /cgi-bin-auth/ "/var/www/cgi-bin/"
+    # Setup for the task tracker, Apache directive processing order noted.
+    #
+    # 1. URL is mapped to a filesystem path via ScriptAlias
+    # 2. LocationMatch fires on the URL, POSTs get rewritten to "/intr-auth/$1"
+    # 3. ScriptAlias maps the rewritten URL to the same filesystem path
+    # 4. Location "/intr-auth/" matches the rewritten URL, requires auth
+    # 5. Directory applies ExecCGI and access controls to the filesystem path
+    
+    # 1: Which URLs triggers which scripts
+    #  
+    #    Make sure the corresponding TASKS_SCRIPT_NAME & DONE_SCRIPT_NAME
+    #    values are set in tasks.py and done.py
+    <IfModule alias_module>
+        ScriptAlias /intr                "/var/www/cgi-me/tasks.py"
+        ScriptAlias /handled             "/var/www/cgi-me/done.py"
+        ScriptAlias /intr-auth/intr      "/var/www/cgi-me/tasks.py"
+        ScriptAlias /intr-auth/handled   "/var/www/cgi-me/done.py"
+    </IfModule>
+    
+    # 2: If any of the end-points listed above use the POST method,
+    #    rewrite the URL and add a fictitious sub-directory.
+    #
+    #    Since the location is new, it's going to re-trigger the
+    #    ScriptAlais lookup above.
+    <LocationMatch "^/(intr|handled)$">
+        RewriteEngine On
+        RewriteCond %{REQUEST_METHOD} POST
+        RewriteRule ^/(intr|handled)$ /intr-auth/$1 [PT,L]
+    </LocationMatch>
+    
+    # 3 (4 if POST): Selective Authentication
+    #
+    # If our fictitious sub-directory is detected, require authentication
+    <Location "/intr-auth/">
+        AuthType Basic
+        AuthName "Interrupt Request Pending"
+        AuthUserFile /etc/apache2/taskstack.passwd
+        Require valid-user
+    </Location>
 
-<Directory "/var/www/cgi-bin">
-    Options +ExecCGI +FollowSymLinks
-    AddHandler cgi-script .py
-    Require ip 127.0.0.1 ::1
-    Require host .example.com
-</Directory>
 
-# Rewrite POSTs to the auth-protected path.
-# Scoped to just these two scripts; other CGI is unaffected.
-<LocationMatch "^/cgi-bin/(tasks|done)\.py$">
-    RewriteEngine On
-    RewriteCond %{REQUEST_METHOD} POST
-    RewriteRule ^/cgi-bin/(tasks|done)\.py$ /cgi-bin-auth/$1.py [PT,L]
-</LocationMatch>
-
-# Auth gate for the POST target.
-<Location "/cgi-bin-auth/">
-    AuthType Basic
-    AuthName "INTR"
-    AuthUserFile /etc/apache2/taskstack.passwd
-    Require valid-user
-</Location>
+    # 4 (5 if POST): Access control 
+    #
+    #   Regardless of the URL or request method, apply these
+    #   access controls to the on-disk assests
+    <Directory "/var/www/cgi-me">
+        Options ExecCGI FollowSymLinks
+        AddHandler cgi-script .py
+        Require ip 127.0.0.1 ::1
+        Require host .uiowa.edu
+    </Directory>
 ```
-
 Adjust the `Require ip` and `Require host` lines to match the networks and
 domains you want to allow read access from.
 
