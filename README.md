@@ -213,6 +213,7 @@ The scripts do not implement CSRF protection.  On an internal network behind
 a firewall this is generally acceptable for a single-user tool, but check your
 local web-service security guidelines before making assumptions.
 
+![INTR services or device gave up](img/intr-banner-done-fade.svg)
 
 **AI disclosure**
 > This code was generated in cooperation with Claude, which is an Artificial 
@@ -225,4 +226,3 @@ local web-service security guidelines before making assumptions.
 > If the project has a rule against AI generated software then DO NOT INCLUDE
 > THIS FILE, in whole or in part, in your patches or pull requests.
 
-![INTR services or device gave up](img/intr-banner-done-fade.svg)
