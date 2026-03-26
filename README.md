@@ -1,4 +1,4 @@
-![People pushing INTR high](intr-banner.svg)
+![People pushing INTR high](img/intr-banner-fade.svg)
 
 # INTR
 
@@ -197,3 +197,5 @@ local web-service security guidelines before making assumptions.
 > Please check the contribution guidelines of any projects you participate in.
 > If the project has a rule against AI generated software then DO NOT INCLUDE
 > THIS FILE, in whole or in part, in your patches or pull requests.
+
+![INTR services or device gave up](img/intr-banner-done-fade.svg)
