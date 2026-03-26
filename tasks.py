@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
 #
-# tasks.py -- Task stack tracker, main view
-# CGI script for Apache. Reads freely, writes require HTTP Basic Auth.
-#
-# This code was generated with Claude, which is an Artificial Intelligence
-# service provided by Anthropic. Though design and development was
-# orchestrated by a human, reviewed by a human and tested by a human,
-# most of the actual code was composed by an AI.
-#
-# It is completely reasonable to forbid AI generated software in some
-# contexts.  Please check the contribution guidelines of any projects you
-# participate in. If the project has a rule against AI generated software
-# then DO NOT INCLUDE THIS FILE, in whole or in part, in your patches
-# or pull requests!
+# tasks.py -- CGI script for Apache. task stack tracker, main view
 
+# Permissions: Public read, write access requires HTTP Basic Auth.
+#
 # All data are stored as JSON files, here's an overview of the `tasks.json`
 # structure:
 # 
@@ -33,9 +23,18 @@
 # `done_YYYY.json` is a flat array of completed task objects, each with
 # `name`, `notes`, `created_at`, and `completed_at` fields.
 #
-# The banners are embedded directly in the Python source as string constants
-# so no external image files need to be found at run-time.  They are also
-# standalone in case you'd like to edit them and re-insert into the sources.
+
+# AI Disclosure:
+#    This code was generated in cooperation with Claude, which is an Artificial 
+#    Intelligence service provided by Anthropic. Though design and development was
+#    orchestrated by a human, reviewed by a human and tested by a human, most of 
+#    the actual code was composed by an AI.
+#   
+#    It is completely reasonable to forbid AI generated software in some contexts.
+#    Please check the contribution guidelines of any projects you participate in.
+#    If the project has a rule against AI generated software then DO NOT INCLUDE
+#    THIS FILE, in whole or in part, in your patches or pull requests.
+
 
 import cgi
 import cgitb

@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 #
 # done.py -- Completed task archive, grouped by calendar week
+#
 # CGI script for Apache. Read-only, no authentication required.
-#
-# This code was generated with Claude, which is an Artificial Intelligence
-# service provided by Anthropic. Though design and development was
-# orchestrated by a human, reviewed by a human and tested by a human,
-# most of the actual code was composed by an AI.
-#
-# It is completely reasonable to forbid AI generated software in some
-# contexts.  Please check the contribution guidelines of any projects you
-# participate in. If the project has a rule against AI generated software
-# then DO NOT INCLUDE THIS FILE, in whole or in part, in your patches
-# or pull requests!
+
+# AI Disclosure:
+#    This code was generated in cooperation with Claude, which is an Artificial 
+#    Intelligence service provided by Anthropic. Though design and development was
+#    orchestrated by a human, reviewed by a human and tested by a human, most of 
+#    the actual code was composed by an AI.
+#   
+#    It is completely reasonable to forbid AI generated software in some contexts.
+#    Please check the contribution guidelines of any projects you participate in.
+#    If the project has a rule against AI generated software then DO NOT INCLUDE
+#    THIS FILE, in whole or in part, in your patches or pull requests.
 
 import cgitb
 import json

@@ -10,33 +10,34 @@ the top slot shows what you're currently doing.  Finished tasks move to a
 yearly done archive.  Co-workers can see your queue without logging in.
 Only you can change anything.
 
-## Files
-
-```
-tasks.py            Main task queue (CGI script)
-done.py             Completed task archive (CGI script)
-intr-banner.svg     Page banner — tasks page
-intr-done-banner.svg  Page banner — done page
-intr-logo.svg       64px page header logo
-intr-favicon.svg    32px favicon (SVG)
-favicon.ico         Favicon (ICO, 16x16 + 32x32)
-```
-
-The banners are embedded directly in the Python source as string constants
-so no external image files need to be deployed alongside the scripts.  The
-standalone SVG files are provided for use in documentation, wikis, or
-anywhere else you want the artwork.
-
 ## Requirements
 
 - Apache 2.4 with `mod_cgi` and `mod_rewrite`
 - Python 3 (stdlib only — no third-party packages)
 - A machine on a trusted internal network
 
-## Data files
+## Configuration
 
-The scripts maintain two kinds of JSON files in a data directory that must
-**not** be under the web root:
+The site is driven by two python files that are symlinked (or just copied)
+into your CGI area.
+
+```
+tasks.py            Main task queue (CGI script)
+done.py             Completed task archive (CGI script)
+```
+
+There are no external configuration files.  
+
+To configure for your site, adjust these two path constants in `tasks.py` and `done.py`:
+
+```python
+TASKS_FILE = '/var/www/taskdata/tasks.json'
+DONE_DIR   = '/var/www/taskdata'
+```
+
+All task data are contained in JSON files. This not the most efficent but
+easier then setting up an external RDBMS.  Pick a directory that you prefer
+that's **not** under the web root, for example:
 
 ```
 /var/www/taskdata/
@@ -46,35 +47,23 @@ The scripts maintain two kinds of JSON files in a data directory that must
     ...
 ```
 
-`tasks.json` structure:
+and edit `tasks.py` and `done.py`.
 
-```json
-{
-    "current":      { "id": "...", "name": "...", "notes": "...", "created_at": "..." },
-    "idle_active":  false,
-    "idle_notes":   "",
-    "queue":        [ { "id": "...", "name": "...", "notes": "...", "created_at": "..." } ]
-}
-```
+At year-end, `done_YYYY.json` stays in place and a new file is created for
+the incoming year.  The done page auto-detects all `done_*.json` files in the
+data directory and shows a year selector when more than one is present.
+Nothing needs to be done manually.
 
-`queue[0]` is the highest priority waiting task.  `current` is what is being
-worked on right now.  When `idle_active` is true the Idle state is active and
-`current` is null.
+You don't have to configure the location of the banners. They are embedded 
+as strings in the python code. They're only provided standalone for ease
+of updates. Updating the images will do nothing on it's own, you'll have
+re-insert them into the CGI scripts to see any changes.
 
-`done_YYYY.json` is a flat array of completed task objects, each with
-`name`, `notes`, `created_at`, and `completed_at` fields.
-
-## Configuration
-
-At the top of both `tasks.py` and `done.py`, adjust these two path constants
-to match your deployment:
-
-```python
-TASKS_FILE = '/var/www/taskdata/tasks.json'
-DONE_DIR   = '/var/www/taskdata'
-```
 
 ## Installation
+
+I'm assuming you're using Apache2 for hosting services at your site.  To setup
+**INTER** run though the following steps.
 
 ### 1. Enable Apache modules
 
@@ -113,10 +102,10 @@ Add the following inside your `<VirtualHost>` block:
 
 ```apache
 # Both paths serve from the same script directory.
-# /cgi-bin/      -> open to all (GET)
-# /cgi-bin-auth/ -> requires Basic Auth (POST target)
-ScriptAlias /cgi-bin/      "/var/www/cgi-me/"
-ScriptAlias /cgi-bin-auth/ "/var/www/cgi-me/"
+# /cgi-me/      -> open to all (GET)
+# /cgi-me-auth/ -> requires Basic Auth (POST target)
+ScriptAlias /cgi-me/      "/var/www/cgi-me/"
+ScriptAlias /cgi-me-auth/ "/var/www/cgi-me/"
 
 <Directory "/var/www/cgi-me">
     Options +ExecCGI +FollowSymLinks
@@ -127,14 +116,14 @@ ScriptAlias /cgi-bin-auth/ "/var/www/cgi-me/"
 
 # Rewrite POSTs to the auth-protected path.
 # Scoped to just these two scripts; other CGI is unaffected.
-<LocationMatch "^/cgi-bin/(tasks|done)\.py$">
+<LocationMatch "^/cgi-me/(tasks|done)\.py$">
     RewriteEngine On
     RewriteCond %{REQUEST_METHOD} POST
-    RewriteRule ^/cgi-bin/(tasks|done)\.py$ /cgi-bin-auth/$1.py [PT,L]
+    RewriteRule ^/cgi-me/(tasks|done)\.py$ /cgi-me-auth/$1.py [PT,L]
 </LocationMatch>
 
 # Auth gate for the POST target.
-<Location "/cgi-bin-auth/">
+<Location "/cgi-me-auth/">
     AuthType Basic
     AuthName "INTR"
     AuthUserFile /etc/apache2/taskstack.passwd
@@ -153,7 +142,7 @@ sudo chown root:www-data /etc/apache2/taskstack.passwd
 sudo chmod 640 /etc/apache2/taskstack.passwd
 ```
 
-After this, `GET /cgi-bin/tasks.py` is open to anyone matching the `Require`
+After this, `GET /cgi-me/tasks.py` is open to anyone matching the `Require`
 directives in the `Directory` block.  POST requests trigger a Basic Auth
 challenge.  `REMOTE_USER` is set by Apache after a successful login and the
 scripts check it before acting on any write operation.
@@ -186,28 +175,21 @@ detect the current year and create a new file automatically.
 
 ## Network and security notes
 
-This tool is designed for use on a **trusted internal network**.  Do not
-expose it to the public internet without HTTPS.  Adding SSL via Let's Encrypt
-or a self-signed cert is recommended even internally if the machine is
-accessible across subnets.
+To post data you'll need to provide a password over the internet. *Obviously*
+you'll host this under HTTPS... right.  
 
+Even with HTTPS enabled, INTR is designed for use on a **trusted internal network**.  
 The scripts do not implement CSRF protection.  On an internal network behind
-a firewall this is generally acceptable for a single-user tool, but be aware
-of the tradeoff if your threat model requires it.
+a firewall this is generally acceptable for a single-user tool, but check your
+local web-service security guidelines before making assumptions.
 
-## Year rollover
-
-At year-end, `done_YYYY.json` stays in place and a new file is created for
-the incoming year.  The done page auto-detects all `done_*.json` files in the
-data directory and shows a year selector when more than one is present.
-Nothing needs to be done manually.
 
 ## AI disclosure
 
-> This code was generated with Claude, which is an Artificial Intelligence
-> service provided by Anthropic. Though design and development was orchestrated
-> by a human, reviewed by a human and tested by a human, most of the actual code
-> was composed by an AI.
+> This code was generated in cooperation with Claude, which is an Artificial 
+> Intelligence service provided by Anthropic. Though design and development was
+> orchestrated by a human, reviewed by a human and tested by a human, most of 
+> the actual code was composed by an AI.
 >
 > It is completely reasonable to forbid AI generated software in some contexts.
 > Please check the contribution guidelines of any projects you participate in.
