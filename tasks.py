@@ -780,6 +780,7 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print('<input type="submit" value="Save"> ')
 			print(f'<a href="{h(script)}">Cancel</a>')
 			print('</form>')
+			print(danger_form('drop_current', '', 'NOP (drop, no log)', 'Drop current task without logging?'))
 		else:
 			cur_label = cur.get('label', '')
 			print(f'<div id="current-title">{h(cur["name"])}{label_badge(cur_label)}</div>')
@@ -791,7 +792,6 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			if authenticated:
 				print('<div class="actions">')
 				print(action_form('complete', '', 'IRET (mark done)', ''))
-				print(danger_form('drop_current', '', 'NOP (drop)', 'Drop current task without logging?'))
 				print(action_form('set_idle', '', 'STI HLT (idle)'))
 				print(f'<a href="{h(script)}?edit=current" style="font-size:12px;">Edit</a>')
 				print('</div>')
@@ -866,7 +866,9 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 				if labels:
 					print(f'Label: {label_select(labels, task.get("label",""))}<br>')
 				print('<input type="submit" value="Save"> ')
-				print(f'<a href="{h(script)}">Cancel</a>')
+				print(f'<a href="{h(script)}">Cancel</a> ')
+				idx_input = f'<input type="hidden" name="idx" value="{i}">'
+				print(danger_form('drop', idx_input, 'NOP (drop, no log)', 'Drop this task without logging?'))
 				print('</form></td>')
 				print(f'<td>{h(age)}</td>')
 				print('<td></td>')
@@ -885,8 +887,7 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 						print(action_form('move_up',   idx_input, '&#x25b2;'))
 					if i < len(queue) - 1:
 						print(action_form('move_down',  idx_input, '&#x25bc;'))
-					print(f'<a href="{h(script)}?edit=queue&idx={i}" style="font-size:11px;">Edit</a> ')
-					print(danger_form('drop', idx_input, 'NOP', 'Drop this task without logging?'))
+					print(f'<a href="{h(script)}?edit=queue&idx={i}" style="font-size:11px;">Edit</a>')
 					print('</td>')
 				else:
 					print('<td></td>')
