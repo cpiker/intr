@@ -30,6 +30,32 @@ and let the task data pile up in the git working copy.  If you decide
 you like it, deployment instructions follow.  You can copy the JSON files
 from your home directory up to the server.
 
+## Usage
+
+### Task queue (tasks.py)
+
+| Action | Description |
+|--------|-------------|
+| PUSH | Add a task at the top (becomes current), at position #2, or at the bottom |
+| CALL | Grab any queued task — it becomes current, old current returns to top of queue |
+| ▲ / ▼ | Nudge a task up or down in the queue without touching the current task |
+| IRET | Completes the current task, logs it to `done_YYYY.json`, promotes the next queued task |
+| IRET (from queue) | Complete a queued task without grabbing it first |
+| NOP | Delete a task permanently with no log entry |
+| Edit | Edit the name or notes of any task inline |
+| STI HLT | Parks the current task back at the top of the queue, go Idle pending an interrupt |
+
+All write actions require HTTP Basic Auth.  Read access is open.
+
+### Done archive (done.py)
+
+Completed tasks grouped by ISO calendar week, newest week first.  Columns:
+task name, date completed, time spent in the stack.
+
+A year selector appears automatically when more than one year's data is
+present.  No cron job or manual action is needed at year-end — the scripts
+detect the current year and create a new file automatically.
+
 ## Deployment Requirements
 
 - Apache 2.4 with `mod_cgi` and `mod_rewrite`
@@ -192,32 +218,6 @@ After this, `GET /cgi-bin/tasks.py` is open to anyone matching the `Require`
 directives in the `Directory` block.  POST requests trigger a Basic Auth
 challenge.  `REMOTE_USER` is set by Apache after a successful login and the
 scripts check it before acting on any write operation.
-
-## Usage
-
-### Task queue (tasks.py)
-
-| Action | Description |
-|--------|-------------|
-| PUSH | Add a task at the top (becomes current), at position #2, or at the bottom |
-| CALL | Grab any queued task — it becomes current, old current returns to top of queue |
-| ▲ / ▼ | Nudge a task up or down in the queue without touching the current task |
-| IRET | Completes the current task, logs it to `done_YYYY.json`, promotes the next queued task |
-| IRET (from queue) | Complete a queued task without grabbing it first |
-| NOP | Delete a task permanently with no log entry |
-| Edit | Edit the name or notes of any task inline |
-| STI HLT | Parks the current task back at the top of the queue, go Idle pending an interrupt |
-
-All write actions require HTTP Basic Auth.  Read access is open.
-
-### Done archive (done.py)
-
-Completed tasks grouped by ISO calendar week, newest week first.  Columns:
-task name, date completed, time spent in the stack.
-
-A year selector appears automatically when more than one year's data is
-present.  No cron job or manual action is needed at year-end — the scripts
-detect the current year and create a new file automatically.
 
 ## Network and security notes
 
