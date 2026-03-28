@@ -75,6 +75,32 @@ TASKS_SCRIPT_NAME = 'intr'
 DONE_SCRIPT_NAME = 'handled'
 
 # ########################################################################### #
+# Label color palette                                                          #
+#                                                                              #
+# Each entry: 'name': ('#background', '#foreground')                          #
+# Order here is the order shown in the color picker.                          #
+# Downstream folks: add, remove, or recolor entries freely.  The name string  #
+# is what gets stored in tasks.json, so renaming an entry here will cause     #
+# existing tasks carrying that name to fall back to the default amber style.  #
+
+LABEL_COLORS = {
+	'amber':    ('#fdf3dc', '#7a5c10'),
+	'rose':     ('#fde8e8', '#8b2020'),
+	'sage':     ('#e6f2e6', '#2a5c2a'),
+	'sky':      ('#dff0fb', '#1a527a'),
+	'lavender': ('#ede8f8', '#4a2d8a'),
+	'mint':     ('#dff5ef', '#185c40'),
+	'steel':    ('#e4eaf2', '#2a3d5c'),
+	'lilac':    ('#f5e8f5', '#6a1a6a'),
+	'sand':     ('#f2eedf', '#4a3d10'),
+	'peach':    ('#fdeede', '#7a3a10'),
+}
+
+# Default color applied to labels that predate this feature, or whose stored
+# color name no longer appears in LABEL_COLORS (e.g. after a rename).
+LABEL_COLOR_DEFAULT = 'amber'
+
+# ########################################################################### #
 # remove cgi module dependency #
 
 def get_post_form():
@@ -107,9 +133,14 @@ def load_tasks():
 	if not os.path.exists(TASKS_FILE):
 		return {"current": None, "idle_notes": "", "idle_active": True, "labels": [], "queue": []}
 	data = json.load(open(TASKS_FILE, 'r'))
-	# Migrate older files that predate the labels field.
+	# Migrate v1: files that predate the labels field entirely.
 	if "labels" not in data:
 		data["labels"] = []
+	# Migrate v2: labels were plain strings; promote to {name, color} dicts.
+	data["labels"] = [
+		lbl if isinstance(lbl, dict) else {"name": lbl, "color": LABEL_COLOR_DEFAULT}
+		for lbl in data["labels"]
+	]
 	return data
 
 def save_tasks(data):
@@ -138,7 +169,7 @@ def save_done(entries):
 		json.dump(entries, f, indent='\t')
 	os.replace(tmp, path)
 
-def new_task(name, notes, label=''):
+def new_task(name, notes, label='', label_color=''):
 	task = {
 		"id": str(uuid.uuid4()),
 		"name": name.strip(),
@@ -147,6 +178,7 @@ def new_task(name, notes, label=''):
 	}
 	if label:
 		task["label"] = label
+		task["label_color"] = label_color or LABEL_COLOR_DEFAULT
 	return task
 
 def is_authenticated():
@@ -226,21 +258,38 @@ def h(s):
 	# HTML-escape a string.
 	return html.escape(str(s) if s else '', quote=True)
 
+def _label_colors(color_name):
+	"""Return (bg, fg) hex pair for a color name, falling back to default."""
+	return LABEL_COLORS.get(color_name, LABEL_COLORS[LABEL_COLOR_DEFAULT])
+
 def label_select(labels, selected='', field_name='label'):
-	"""Render a <select> dropdown for label choice.  Empty option = no label."""
+	"""Render a <select> dropdown for label choice.  Empty option = no label.
+	Labels is a list of {name, color} dicts."""
 	out = [f'<select name="{field_name}">']
 	out.append('<option value="">(no label)</option>')
 	for lbl in labels:
-		sel = ' selected' if lbl == selected else ''
-		out.append(f'<option value="{h(lbl)}"{sel}>{h(lbl)}</option>')
+		name  = lbl['name']
+		color = lbl.get('color', LABEL_COLOR_DEFAULT)
+		bg, fg = _label_colors(color)
+		sel = ' selected' if name == selected else ''
+		# Inline badge style on each option so the user sees the color in the dropdown.
+		out.append(
+			f'<option value="{h(name)}"{sel} '
+			f'style="background:{bg};color:{fg};">{h(name)}</option>'
+		)
 	out.append('</select>')
 	return ''.join(out)
 
-def label_badge(label):
-	"""Render a label badge span, or empty string if no label."""
+def label_badge(label, color=None):
+	"""Render a colored label badge span, or empty string if no label.
+	color is a key into LABEL_COLORS; falls back to default if absent/unknown."""
 	if not label:
 		return ''
-	return f'<span class="label-badge">{h(label)}</span>'
+	bg, fg = _label_colors(color or LABEL_COLOR_DEFAULT)
+	return (
+		f'<span class="label-badge" '
+		f'style="background:{bg};color:{fg};">{h(label)}</span>'
+	)
 
 # ########################################################################### #
 # Handle POST actions (all require auth) #
@@ -259,12 +308,17 @@ def handle_post(form, data):
 		notes = form.getvalue('notes', '').strip()
 		label = form.getvalue('label', '').strip()[:32]
 		pos   = form.getvalue('pos', 'top')
-		# Validate label against master list (ignore if not present)
-		if label and label not in data.get('labels', []):
+		# Validate label name against master list; find its color entry.
+		label_color = ''
+		label_names = [l['name'] for l in data.get('labels', [])]
+		if label and label not in label_names:
 			label = ''
+		if label:
+			entry = next((l for l in data['labels'] if l['name'] == label), None)
+			label_color = entry['color'] if entry else LABEL_COLOR_DEFAULT
 		if not name:
 			redirect(); return
-		task = new_task(name, notes, label)
+		task = new_task(name, notes, label, label_color)
 		if pos == 'top':
 			# New task becomes current; old current goes to top of queue.
 			if data['current'] and not data['idle_active']:
@@ -365,16 +419,23 @@ def handle_post(form, data):
 		name   = form.getvalue('name', '').strip()
 		notes  = form.getvalue('notes', '').strip()
 		label  = form.getvalue('label', '').strip()[:32]
-		# Validate label — empty string means "no label"
-		if label and label not in data.get('labels', []):
+		# Validate label name; resolve its color.
+		label_color = ''
+		label_names = [l['name'] for l in data.get('labels', [])]
+		if label and label not in label_names:
 			label = ''
+		if label:
+			entry = next((l for l in data['labels'] if l['name'] == label), None)
+			label_color = entry['color'] if entry else LABEL_COLOR_DEFAULT
 		if target == 'current' and data['current']:
 			if name: data['current']['name']  = name
 			data['current']['notes'] = notes
 			if label:
-				data['current']['label'] = label
+				data['current']['label']       = label
+				data['current']['label_color'] = label_color
 			else:
 				data['current'].pop('label', None)
+				data['current'].pop('label_color', None)
 		elif target == 'idle':
 			data['idle_notes'] = notes
 		else:
@@ -383,9 +444,11 @@ def handle_post(form, data):
 				if name: data['queue'][idx]['name']  = name
 				data['queue'][idx]['notes'] = notes
 				if label:
-					data['queue'][idx]['label'] = label
+					data['queue'][idx]['label']       = label
+					data['queue'][idx]['label_color'] = label_color
 				else:
 					data['queue'][idx].pop('label', None)
+					data['queue'][idx].pop('label_color', None)
 
 	elif action == 'set_idle':
 		# Park current task back on queue, set state to Idle.
@@ -396,18 +459,21 @@ def handle_post(form, data):
 		data['idle_active'] = True
 
 	elif action == 'add_label':
-		# Add a new label to the master list.  32-char max, no dupes.
+		# Add a new label to the master list.  32-char max, no dupes by name.
 		new_label = form.getvalue('label_name', '').strip()[:32]
-		if new_label and new_label not in data.get('labels', []):
-			data.setdefault('labels', []).append(new_label)
+		new_color = form.getvalue('label_color', LABEL_COLOR_DEFAULT)
+		if new_color not in LABEL_COLORS:
+			new_color = LABEL_COLOR_DEFAULT
+		label_names = [l['name'] for l in data.get('labels', [])]
+		if new_label and new_label not in label_names:
+			data.setdefault('labels', []).append({'name': new_label, 'color': new_color})
 
 	elif action == 'remove_label':
-		# Remove a label from the master list.  Tasks that carry it keep
+		# Remove a label from the master list by name.  Tasks that carry it keep
 		# their label value (historical record); it just won't appear in
 		# dropdowns anymore until re-added.
 		del_label = form.getvalue('label_name', '').strip()
-		if del_label in data.get('labels', []):
-			data['labels'].remove(del_label)
+		data['labels'] = [l for l in data.get('labels', []) if l['name'] != del_label]
 
 	save_tasks(data)
 	redirect()
@@ -685,14 +751,11 @@ tr:hover td { background: #f0f0f0; }
 .btn-link:visited { color: #111; }
 .btn-link:hover { background: #d0d0d0; }
 
-/* Label badge */
+/* Label badge — colors applied via inline style; only structure here */
 .label-badge {
 	display: inline-block;
 	font-size: 10px;
 	padding: 1px 5px;
-	/* border: 1px solid #b8922a; */
-	background: #fdf3dc;
-	color: #7a5c10;
 	border-radius: 2px;
 	margin-left: 4px;
 	vertical-align: middle;
@@ -883,7 +946,7 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 			print(danger_form('drop_current', '', 'NOP (drop, no log)', 'Drop current task without logging?'))
 		else:
 			cur_label = cur.get('label', '')
-			print(f'<div id="current-title">{label_badge(cur_label)}{h(cur["name"])}</div>')
+			print(f'<div id="current-title">{label_badge(cur_label, cur.get("label_color",""))}{h(cur["name"])}</div>')
 			notes = cur.get('notes', '')
 			if notes:
 				print(f'<div class="task-notes">{h(notes)}</div>')
@@ -978,7 +1041,7 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 				print('<td></td>')
 			else:
 				task_label = task.get('label', '')
-				print(f'<td>{label_badge(task_label)} <span class="taskname">{h(task["name"])}</span></td>')
+				print(f'<td>{label_badge(task_label, task.get("label_color",""))} <span class="taskname">{h(task["name"])}</span></td>')
 				notes = task.get('notes', '')
 				print(f'<td><span class="qnotes">{h(notes)}</span></td>')
 				print(f'<td>{h(age)}</td>')
@@ -1008,16 +1071,42 @@ def render_page(data, authenticated, edit_target=None, edit_idx=None, show_push=
 		if labels:
 			print('<div class="label-list">')
 			for lbl in labels:
-				lbl_input = f'<input type="hidden" name="label_name" value="{h(lbl)}">'
-				print(f'{label_badge(lbl)} ')
-				print(danger_form('remove_label', lbl_input, '&times;', f"Remove label '{lbl}'?"))
+				lbl_name  = lbl['name']
+				lbl_color = lbl.get('color', LABEL_COLOR_DEFAULT)
+				lbl_input = f'<input type="hidden" name="label_name" value="{h(lbl_name)}">'
+				print(f'{label_badge(lbl_name, lbl_color)} ')
+				print(danger_form('remove_label', lbl_input, '&times;', f"Remove label '{lbl_name}'?"))
 			print('</div>')
 		else:
 			print(' <span style="color:#aaa;font-size:11px;">(none defined)</span>')
+
+		# Color picker buttons for the add-label form.
+		# Rendered as small square buttons (distinct from the badge style used
+		# in the label list, which is not clickable).  No default selection —
+		# submitting without picking a color triggers a JS alert instead of
+		# silently defaulting, so the user is always aware of what they chose.
+		swatches = ''.join(
+			f'<label style="margin-right:3px;cursor:pointer;">'
+			f'<input type="radio" name="label_color" value="{cname}" style="display:none;"'
+			f' onclick="document.querySelectorAll(\'.swatch-btn\').forEach('
+			f'function(e){{e.style.boxShadow=\'\';e.style.border=\'2px solid #888\';}});'
+			f'this.nextElementSibling.style.border=\'2px solid {fg}\';'
+			f'this.nextElementSibling.style.boxShadow=\'inset 0 2px 4px rgba(0,0,0,0.25)\';">'
+			f'<span class="swatch-btn" '
+			f'style="display:inline-block;width:52px;height:14x;line-height:14px;'
+			f'text-align:center;font-family:monospace;font-size:10px;font-weight:bold;'
+			f'background:{bg};color:{fg};border:2px solid #888;border-radius:3px;'
+			f'cursor:pointer;vertical-align:middle;">'
+			f'{h(cname)}</span></label>'
+			for cname, (bg, fg) in LABEL_COLORS.items()
+		)
 		print(f'<div id="label-add-form">')
-		print(f'<form method="post" action="{h(script)}">')
+		print(f'<form method="post" action="{h(script)}" '
+		      f'onsubmit="if(!this.querySelector(\'input[name=label_color]:checked\'))'
+		      f'{{alert(\'Pick a color first.\');return false;}}">')
 		print('<input type="hidden" name="action" value="add_label">')
 		print('<input type="text" name="label_name" maxlength="32" placeholder="New label (32 char max)">')
+		print(f'<div style="margin:5px 0 5px;">{swatches}</div>')
 		print('<input type="submit" value="Add">')
 		print('</form>')
 		print('</div>')
