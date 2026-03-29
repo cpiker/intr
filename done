@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# done -- Completed task archive, grouped by calendar week
+# done.py -- Completed task archive, grouped by calendar week
 #
 # CGI script for Apache. Read-only, no authentication required.
 
@@ -34,16 +34,41 @@ TASKS_SCRIPT_NAME = 'tasks'
 DONE_SCRIPT_NAME = 'done'
 
 # ########################################################################### #
+# Label color palette                                                          #
+#                                                                              #
+# Keep this in sync with the copy in tasks.py.                                #
+# Each entry: 'name': ('#background', '#foreground')                          #
+
+LABEL_COLORS = {
+	'amber':    ('#fdf3dc', '#7a5c10'),
+	'rose':     ('#fde8e8', '#8b2020'),
+	'sage':     ('#e6f2e6', '#2a5c2a'),
+	'sky':      ('#dff0fb', '#1a527a'),
+	'lavender': ('#ede8f8', '#4a2d8a'),
+	'mint':     ('#dff5ef', '#185c40'),
+	'steel':    ('#e4eaf2', '#2a3d5c'),
+	'lilac':    ('#f5e8f5', '#6a1a6a'),
+	'sand':     ('#f2eedf', '#4a3d10'),
+	'peach':    ('#fdeede', '#7a3a10'),
+}
+
+LABEL_COLOR_DEFAULT = 'amber'
+
+# ########################################################################### #
 # helpers #
 
 def h(s):
 	return html.escape(str(s) if s else '', quote=True)
 
-def label_badge(label):
-	"""Render a label badge span, or empty string if no label."""
+def label_badge(label, color=None):
+	"""Render a colored label badge span, or empty string if no label."""
 	if not label:
 		return ''
-	return f'<span class="label-badge">{h(label)}</span>'
+	bg, fg = LABEL_COLORS.get(color or LABEL_COLOR_DEFAULT, LABEL_COLORS[LABEL_COLOR_DEFAULT])
+	return (
+		f'<span class="label-badge" '
+		f'style="background:{bg};color:{fg};">{h(label)}</span>'
+	)
 
 def load_done(year):
 	path = os.path.join(DONE_DIR, f'done_{year}.json')
@@ -312,14 +337,11 @@ tr:hover td { background: #f0f0f0; }
 .week-count { font-size: 11px; color: #888; float: right; font-weight: normal; }
 #year-select { font-size: 13px; margin-bottom: 12px; }
 
-/* Label badge — matches tasks */
+/* Label badge — colors applied via inline style; only structure here */
 .label-badge {
 	display: inline-block;
 	font-size: 10px;
 	padding: 1px 5px;
-	/* border: 1px solid #b8922a; */
-	background: #fdf3dc;
-	color: #7a5c10;
 	border-radius: 2px;
 	margin-left: 4px;
 	vertical-align: middle;
@@ -437,14 +459,14 @@ def main():
 				print(f'<tr{row_class}>')
 				# Name cell: label badge + name + abandoned marker
 				abandoned_badge = '<span class="abandoned-badge">NOP</span>' if abandoned else ''
-				print(f'<td class="taskname">{label_badge(task_label)}{h(name)}{abandoned_badge}</td>')
+				print(f'<td class="taskname">{label_badge(task_label, entry.get("label_color",""))}{h(name)}{abandoned_badge}</td>')
 				print(f'<td class="date-col">{h(comp_str)}</td>')
 				print(f'<td class="age-col">{h(age)}</td>')
 				print(f'<td class="age-col">{active_str}</td>')
 				print(f'</tr>')
 			print('</table>')
 
-	print(f'<p style="font-size:10px;color:#bbb;margin-top:16px;">done</p>')
+	print(f'<p style="font-size:10px;color:#bbb;margin-top:16px;">done.py</p>')
 	print('</div></body></html>')
 
 main()

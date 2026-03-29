@@ -34,14 +34,13 @@ from your home directory up to the server.
 
 ### Task queue (tasks)
 
- Action | Description |
+| Action | Description |
 |--------|-------------|
 | PUSH | Add a task at the top (becomes current), at position #2, or at the bottom |
 | CALL | Grab any queued task &mdash; it becomes current, old current returns to top of queue |
 | ▲ / ▼ | Nudge a task up or down in the queue without touching the current task |
 | IRET | Completes the current task, logs it to `done_YYYY.json`, promotes the next queued task |
 | IRET (from queue) | Complete a queued task without grabbing it first |
-| NOP | Delete a task permanently with no log entry |
 | Edit | Edit the name or notes of any task inline |
 | STI HLT | Parks the current task back at the top of the queue, go Idle pending an interrupt |
 
@@ -53,7 +52,7 @@ Completed tasks grouped by ISO calendar week, newest week first.  Columns:
 task name, date completed, time spent in the stack.
 
 A year selector appears automatically when more than one year's data is
-present.  No cron job or manual action is needed at year-end the scripts
+present.  No cron job or manual action is needed at year-end &mdash; the scripts
 detect the current year and create a new file automatically.
 
 ## Deployment
