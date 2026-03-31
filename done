@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# done.py -- Completed task archive, grouped by calendar week
+# done -- Completed task archive, grouped by calendar week
 #
 # CGI script for Apache. Read-only, no authentication required.
 
@@ -30,20 +30,8 @@ TASKS_FILE = os.environ.get('INTR_TASKS_FILE', '/var/www/taskdata/tasks.json')
 # Memorial for adventures of yore
 DONE_DIR   = os.environ.get('INTR_DONE_DIR',   '/var/www/taskdata')
 
-# Extern names of scripts. Needed for cross links
-#
-#   ScriptAlias /some/url/path/tasks            "/var/www/cgi-bin/tasks.py"
-#   ScriptAlias /some/url/path/intr-auth/tasks  "/var/www/cgi-bin/tasks.py"
-#
-#   ScriptAlias /some/url/path/done            "/var/www/cgi-bin/done.py"
-#   ScriptAlias /some/url/path/intr-auth/done  "/var/www/cgi-bin/done.py"
-#
-#  So in the case above TASK_PATH_TOK would be "tasks" and the done token
-#  would be "done".  I prefer to use 'intr' and 'handled', so that's what's
-#  in the readme.
-
-TASKS_SCRIPT_NAME = 'tasks.py'
-DONE_SCRIPT_NAME = 'done.py'
+TASKS_SCRIPT_NAME = 'tasks'
+DONE_SCRIPT_NAME = 'done'
 
 # ########################################################################### #
 # helpers #
@@ -324,7 +312,7 @@ tr:hover td { background: #f0f0f0; }
 .week-count { font-size: 11px; color: #888; float: right; font-weight: normal; }
 #year-select { font-size: 13px; margin-bottom: 12px; }
 
-/* Label badge — matches tasks.py */
+/* Label badge — matches tasks */
 .label-badge {
 	display: inline-block;
 	font-size: 10px;
@@ -456,7 +444,7 @@ def main():
 				print(f'</tr>')
 			print('</table>')
 
-	print(f'<p style="font-size:10px;color:#bbb;margin-top:16px;">done.py</p>')
+	print(f'<p style="font-size:10px;color:#bbb;margin-top:16px;">done</p>')
 	print('</div></body></html>')
 
 main()

@@ -2,12 +2,12 @@
 # /path/to/application/.htaccess
 
 Options +ExecCGI
-AddHandler cgi-script .py
 
 SetEnv INTR_TASKS_FILE "/path/to/application/data/tasks.json"
 SetEnv INTR_DONE_DIR   "/path/to/application/data"
 
 <FilesMatch "^(tasks|done)\.py$">
+  AddHandler cgi-script
   AuthType Basic
   AuthName "INTR Task Tracker"
   # Even better, feel free to put this one level up

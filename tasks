@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# tasks.py -- CGI script for Apache. task stack tracker, main view
+# tasks -- CGI script for Apache. task stack tracker, main view
 
 # Permissions: Public read, write access requires HTTP Basic Auth.
 #
@@ -59,20 +59,8 @@ TASKS_FILE = os.environ.get('INTR_TASKS_FILE', '/var/www/taskdata/tasks.json')
 # Memorial for adventures of yore
 DONE_DIR   = os.environ.get('INTR_DONE_DIR',   '/var/www/taskdata')
 
-# Tokens to help the two scripts link to each other, assuming same relative path
-#
-#   ScriptAlias /some/url/path/tasks            "/var/www/cgi-bin/tasks.py"
-#   ScriptAlias /some/url/path/intr-auth/tasks  "/var/www/cgi-bin/tasks.py"
-#
-#   ScriptAlias /some/url/path/done            "/var/www/cgi-bin/done.py"
-#   ScriptAlias /some/url/path/intr-auth/done  "/var/www/cgi-bin/done.py"
-#
-#  So in the case above TASK_PATH_TOK would be "tasks" and the done token
-#  would be "done".  I prefer to use 'intr' and 'handled', so that's what's
-#  in the readme.
-
-TASKS_SCRIPT_NAME = 'tasks.py'
-DONE_SCRIPT_NAME = 'done.py'
+TASKS_SCRIPT_NAME = 'tasks'
+DONE_SCRIPT_NAME = 'done'
 
 # ########################################################################### #
 # remove cgi module dependency #
