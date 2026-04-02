@@ -37,7 +37,7 @@ from your home directory up to the server.
  Action | Description |
 |--------|-------------|
 | PUSH | Add a task at the top (becomes current), at position #2, or at the bottom |
-| CALL | Grab any queued task &emdash; it becomes current, old current returns to top of queue |
+| CALL | Grab any queued task &#mdash; it becomes current, old current returns to top of queue |
 | ▲ / ▼ | Nudge a task up or down in the queue without touching the current task |
 | IRET | Completes the current task, logs it to `done_YYYY.json`, promotes the next queued task |
 | IRET (from queue) | Complete a queued task without grabbing it first |
@@ -178,8 +178,8 @@ similar to the following after data are entered.
 
 ```
 /path/to/application/data/
-    tasks.json          Current queue &emdash; auto-created on first write
-    done_2026.json      Completed tasks for the year &emdash; auto-created
+    tasks.json          Current queue &mdash; auto-created on first write
+    done_2026.json      Completed tasks for the year &mdash; auto-created
     done_2025.json      Previous years accumulate here automatically
     ...
 ```
