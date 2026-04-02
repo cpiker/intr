@@ -15,7 +15,7 @@
 # and TLS configuration (see the readme).
 #
 # Usage:
-#   python3 serve.py [port]        (default port: 8080)
+#   python3 serve.py [port]        (default port: 8088)
 #
 # Authentication is disabled in standalone mode -- all actions are
 # permitted without credentials.
@@ -35,7 +35,7 @@ import urllib.parse
 # ########################################################################### #
 # configuration #
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8088
 
 # These route names must match TASKS_SCRIPT_NAME and DONE_SCRIPT_NAME in
 # tasks and done respectively.  If you change them there, change them
