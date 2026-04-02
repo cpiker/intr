@@ -40,8 +40,8 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8088
 # These route names must match TASKS_SCRIPT_NAME and DONE_SCRIPT_NAME in
 # tasks and done respectively.  If you change them there, change them
 # here too.
-TASKS_ROUTE = 'intr'
-DONE_ROUTE  = 'handled'
+TASKS_ROUTE = 'tasks'
+DONE_ROUTE  = 'done'
 
 # ########################################################################### #
 
