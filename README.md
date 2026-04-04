@@ -2,15 +2,15 @@
 
 # INTR
 
-A single-user task tracker for people with more work than time. Named after
+A single-user task tracker for people with more work than time.  Named after
 the interrupt request pin on the Intel 8088 — because *something* is always
 driving that pin high.
 
 The queue is priority-ordered top to bottom, but tasks don't have to be
-handled in priority order. You grab whatever makes sense to work on, and the
-top slot shows what you're currently doing. Finished tasks move to a yearly
-done archive. Co-workers can see your queue without logging in. Only you can
-change anything.
+handled in priority order.  You grab whatever makes sense to work on, and
+the top slot shows what you're currently doing.  Finished tasks move to a
+yearly done archive.  Co-workers can see your queue without logging in.
+Only you can change anything.
 
 ![Task page screenshot](img/screenshot.png)
 
@@ -20,11 +20,11 @@ If you don't feel like deploying to Apache or any other host, just run
 ```bash
 git clone git@github.com:cpiker/intr.git
 cd intr
-python3.7 serve.py  # Or higher python version
+python3 serve.py  # Python 3.7 or higher
 ```
 then open your browser to:
 ```
-http://localhost:8080/intr
+http://localhost:8088/intr
 ```
 and let the task data pile up in the git working copy.  If you decide
 you like it, deployment instructions follow.  You can copy the JSON files
@@ -32,28 +32,27 @@ from your home directory up to the server.
 
 ## Usage
 
-### Task queue (tasks.py)
+### Task queue (tasks)
 
- Action | Description |
+| Action | Description |
 |--------|-------------|
 | PUSH | Add a task at the top (becomes current), at position #2, or at the bottom |
-| CALL | Grab any queued task \u2014 it becomes current, old current returns to top of queue |
+| CALL | Grab any queued task &mdash; it becomes current, old current returns to top of queue |
 | ▲ / ▼ | Nudge a task up or down in the queue without touching the current task |
 | IRET | Completes the current task, logs it to `done_YYYY.json`, promotes the next queued task |
 | IRET (from queue) | Complete a queued task without grabbing it first |
-| NOP | Delete a task permanently with no log entry |
 | Edit | Edit the name or notes of any task inline |
 | STI HLT | Parks the current task back at the top of the queue, go Idle pending an interrupt |
 
 All write actions require HTTP Basic Auth.  Read access is open.
 
-### Done archive (done.py)
+### Done archive (done)
 
 Completed tasks grouped by ISO calendar week, newest week first.  Columns:
 task name, date completed, time spent in the stack.
 
 A year selector appears automatically when more than one year's data is
-present.  No cron job or manual action is needed at year-end the scripts
+present.  No cron job or manual action is needed at year-end &mdash; the scripts
 detect the current year and create a new file automatically.
 
 ## Deployment
@@ -68,11 +67,11 @@ Place the scripts in a directory accessible to the web server, and create a
 `data` subdirectory that the web server user (e.g., `www-data` or `apache`)
 can write to.
 
-```bash
+```
 /path/to/application/
 ├── .htaccess
-├── tasks.py
-├── done.py
+├── tasks
+├── done
 └── data/          # Must be writable by the web server
 ```
 
@@ -89,7 +88,7 @@ and "/path/to/application" with the actual location.
 # trusted user CGI
 Alias /usercgi /path/to/application
 <Directory "/path/to/application">
-  AllowOverride FileInfo Options AuthConfig Indexes
+  AllowOverride FileInfo Options AuthConfig
   Require all denied
 </Directory>
 ```
@@ -109,12 +108,12 @@ not to provide access to anything unnecessary.
 # /path/to/application/.htaccess
 
 Options +ExecCGI
-AddHandler cgi-script .py
 
 SetEnv INTR_TASKS_FILE "/path/to/application/data/tasks.json"
 SetEnv INTR_DONE_DIR   "/path/to/application/data"
 
-<FilesMatch "^(tasks|done)\.py$">
+<FilesMatch "^(tasks|done)$">
+  SetHandler cgi-script
   AuthType Basic
   AuthName "INTR Task Tracker"
   # Even better, feel free to put this one level up
@@ -133,23 +132,28 @@ SetEnv INTR_DONE_DIR   "/path/to/application/data"
 </FilesMatch>
 ```
 
+**NOTE:** Since only the two (correctly spelled) scripts are explicitly
+configured to be accessible, any typos will result in `403 Forbidden`
+instead of `404 Not Found` errors.  There is potential for confusion here,
+both on the part of users and people looking at Apache error logs.
+
 ### 4\. Permissions and Authentication
 
 For modularity, these are described as being installed in
-"/path/to/application" but for extra security may be elsewhere, perhaps in an
-adjacent directory.
+"/path/to/application" but for extra security the data directory and password
+file may be elsewhere, perhaps in an adjacent directory.
 
 1.  **Make the scripts executable:**
 
     ```bash
     cd /path/to/application
-    chmod +x tasks.py done.py
+    chmod +x tasks done
     ```
 
 2.  **Set data directory ownership:**
 
     ```bash
-    chgrp www-data /path/to/application/data
+    chgrp www-data /path/to/application/data # or group apache
     chmod 2770 /path/to/application/data
     ```
 
@@ -173,8 +177,8 @@ similar to the following after data are entered.
 
 ```
 /path/to/application/data/
-    tasks.json          Current queue \u2014 auto-created on first write
-    done_2026.json      Completed tasks for the year \u2014 auto-created
+    tasks.json          Current queue &mdash; auto-created on first write
+    done_2026.json      Completed tasks for the year &mdash; auto-created
     done_2025.json      Previous years accumulate here automatically
     ...
 ```
@@ -196,12 +200,14 @@ protects write operations, the scripts do not implement CSRF protection.
 Always host the application under HTTPS to protect credentials sent during the
 login process.
 
-**AI disclosure**
+![INTR services or device gave up](img/intr-banner-done-fade.svg)
 
-> This code was generated in cooperation with Claude, which is an Artificial
+**AI disclosure**
+> This code was generated in cooperation with Claude, which is an Artificial 
 > Intelligence service provided by Anthropic. Though design and development was
 > orchestrated by a human, reviewed by a human and tested by a human, most of
-> the actual code was composed by an AI.
+> the actual code was composed by an AI.  The final operating configuration
+> and code tweaks were suggested by Google/Gemini as well.
 >
 > It is completely reasonable to forbid AI generated software in some contexts.
 > Please check the contribution guidelines of any projects you participate in.

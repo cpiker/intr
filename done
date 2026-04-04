@@ -30,20 +30,8 @@ TASKS_FILE = os.environ.get('INTR_TASKS_FILE', '/var/www/taskdata/tasks.json')
 # Memorial for adventures of yore
 DONE_DIR   = os.environ.get('INTR_DONE_DIR',   '/var/www/taskdata')
 
-# Extern names of scripts. Needed for cross links
-#
-#   ScriptAlias /some/url/path/tasks            "/var/www/cgi-bin/tasks.py"
-#   ScriptAlias /some/url/path/intr-auth/tasks  "/var/www/cgi-bin/tasks.py"
-#
-#   ScriptAlias /some/url/path/done            "/var/www/cgi-bin/done.py"
-#   ScriptAlias /some/url/path/intr-auth/done  "/var/www/cgi-bin/done.py"
-#
-#  So in the case above TASK_PATH_TOK would be "tasks" and the done token
-#  would be "done".  I prefer to use 'intr' and 'handled', so that's what's
-#  in the readme.
-
-TASKS_SCRIPT_NAME = 'intr'
-DONE_SCRIPT_NAME = 'handled'
+TASKS_SCRIPT_NAME = 'tasks'
+DONE_SCRIPT_NAME = 'done'
 
 # ########################################################################### #
 # Label color palette                                                          #

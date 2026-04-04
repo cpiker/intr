@@ -8,14 +8,14 @@
 #
 # For production use, just deploy:
 #
-#     tasks.py 
-#     done.py 
+#     tasks 
+#     done 
 #
 # as CGI endpoint scripts under Apache httpd with appropriate auth
 # and TLS configuration (see the readme).
 #
 # Usage:
-#   python3 serve.py [port]        (default port: 8080)
+#   python3 serve.py [port]        (default port: 8088)
 #
 # Authentication is disabled in standalone mode -- all actions are
 # permitted without credentials.
@@ -35,13 +35,13 @@ import urllib.parse
 # ########################################################################### #
 # configuration #
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8088
 
 # These route names must match TASKS_SCRIPT_NAME and DONE_SCRIPT_NAME in
-# tasks.py and done.py respectively.  If you change them there, change them
+# tasks and done respectively.  If you change them there, change them
 # here too.
-TASKS_ROUTE = 'intr'
-DONE_ROUTE  = 'handled'
+TASKS_ROUTE = 'tasks'
+DONE_ROUTE  = 'done'
 
 # ########################################################################### #
 
@@ -49,8 +49,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Map friendly route name -> script file path on disk.
 ROUTES = {
-	TASKS_ROUTE: os.path.join(SCRIPT_DIR, 'tasks.py'),
-	DONE_ROUTE:  os.path.join(SCRIPT_DIR, 'done.py'),
+	TASKS_ROUTE: os.path.join(SCRIPT_DIR, 'tasks'),
+	DONE_ROUTE:  os.path.join(SCRIPT_DIR, 'done'),
 }
 
 
@@ -102,7 +102,7 @@ class INTRHandler(http.server.BaseHTTPRequestHandler):
 			'REMOTE_USER':       'local',
 			'REMOTE_ADDR':       '127.0.0.1',
 
-			# Data file locations.  tasks.py and done.py read these via
+			# Data file locations.  tasks and done read these via
 			# os.environ.get() with hardcoded paths as fallback defaults.
 			'INTR_TASKS_FILE':   os.path.join(SCRIPT_DIR, 'tasks.json'),
 			'INTR_DONE_DIR':     SCRIPT_DIR,
